@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Marathon Training Tracker</title>
 
   <!-- PWA Manifest -->
@@ -26,6 +26,18 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       -webkit-font-smoothing: antialiased;
       overscroll-behavior-y: none;
+      /* Prevent scrolling past boundaries on iOS */
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    #root {
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
     }
     .workout-card {
       transition: all 0.2s ease;
@@ -34,21 +46,15 @@
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
+    /* iOS safe area support */
+    .header-with-safe-area {
+      padding-top: env(safe-area-inset-top);
+    }
+    .footer-with-safe-area {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
     @media print {
       .no-print { display: none; }
-    }
-    .install-banner {
-      animation: slideUp 0.3s ease-out;
-    }
-    @keyframes slideUp {
-      from {
-        transform: translateY(100%);
-        opacity: 0;
-      }
-      to {
-        transform: translateY(0);
-        opacity: 1;
-      }
     }
   </style>
 </head>
@@ -342,9 +348,6 @@
       const [completedWorkouts, setCompletedWorkouts] = useState(getCompletedWorkouts());
       const [workoutNotes, setWorkoutNotes] = useState(getWorkoutNotes());
       const [showPlanInfo, setShowPlanInfo] = useState(false);
-      const [deferredPrompt, setDeferredPrompt] = useState(null);
-      const [showInstallBanner, setShowInstallBanner] = useState(false);
-      const [isInstalled, setIsInstalled] = useState(false);
 
       useEffect(() => {
         console.log('Fetching workout plan from:', GIST_RAW_URL);
@@ -391,39 +394,8 @@
           });
       }, []);
 
-      // PWA Installation Detection
+      // Register service worker
       useEffect(() => {
-        // Check if already installed
-        if (window.matchMedia('(display-mode: standalone)').matches ||
-            window.navigator.standalone === true) {
-          setIsInstalled(true);
-          console.log('App is installed');
-        }
-
-        // Listen for beforeinstallprompt event
-        const handleBeforeInstallPrompt = (e) => {
-          e.preventDefault();
-          setDeferredPrompt(e);
-          // Show install banner after a short delay
-          setTimeout(() => {
-            if (!isInstalled) {
-              setShowInstallBanner(true);
-            }
-          }, 3000);
-        };
-
-        // Listen for appinstalled event
-        const handleAppInstalled = () => {
-          setIsInstalled(true);
-          setShowInstallBanner(false);
-          setDeferredPrompt(null);
-          console.log('App installed successfully');
-        };
-
-        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-        window.addEventListener('appinstalled', handleAppInstalled);
-
-        // Register service worker
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
@@ -433,29 +405,7 @@
               console.log('Service Worker registration failed:', error);
             });
         }
-
-        return () => {
-          window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-          window.removeEventListener('appinstalled', handleAppInstalled);
-        };
-      }, [isInstalled]);
-
-      const handleInstallClick = async () => {
-        if (!deferredPrompt) {
-          return;
-        }
-
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`User response to install prompt: ${outcome}`);
-
-        setDeferredPrompt(null);
-        setShowInstallBanner(false);
-      };
-
-      const handleDismissInstall = () => {
-        setShowInstallBanner(false);
-      };
+      }, []);
 
       const allWeeks = useMemo(() => {
         if (!plan) return [];
@@ -555,9 +505,9 @@
       const daysUntilRace = Math.ceil((new Date(plan.race_date) - new Date()) / (1000 * 60 * 60 * 24));
 
       return (
-        <div className="min-h-screen" style={{ paddingTop: '80px', paddingBottom: '80px' }}>
+        <div className="min-h-screen" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))' }}>
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-green-600 text-white p-4 sticky top-0 z-10 shadow-lg">
+          <div className="bg-blue-600 text-white p-4 sticky top-0 z-10 shadow-lg header-with-safe-area">
             <div className="max-w-4xl mx-auto">
               <div className="flex items-center justify-between">
                 <div>
@@ -648,42 +598,9 @@
             />
           </div>
 
-          {/* PWA Install Banner */}
-          {showInstallBanner && !isInstalled && (
-            <div className="fixed left-0 right-0 z-20 install-banner no-print" style={{ bottom: '90px' }}>
-              <div className="max-w-4xl mx-auto px-4">
-                <div className="bg-blue-600 dark:bg-blue-700 text-white rounded-lg shadow-xl p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="text-2xl">📱</div>
-                      <div>
-                        <div className="font-semibold text-sm">Install Marathon Tracker</div>
-                        <div className="text-xs opacity-90">Add to home screen for quick access</div>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleInstallClick}
-                        className="px-4 py-2 bg-white text-blue-600 rounded-lg font-medium text-sm hover:bg-gray-100 transition"
-                      >
-                        Install
-                      </button>
-                      <button
-                        onClick={handleDismissInstall}
-                        className="px-3 py-2 bg-blue-700 dark:bg-blue-800 text-white rounded-lg text-sm hover:bg-blue-800 dark:hover:bg-blue-900 transition"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Fixed Footer Navigation */}
-          <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-10 no-print" style={{ height: '80px' }}>
-            <div className="max-w-4xl mx-auto px-4 h-full flex flex-col justify-center">
+          <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-10 no-print footer-with-safe-area">
+            <div className="max-w-4xl mx-auto px-4 py-4 flex flex-col justify-center">
               <div className="flex items-center justify-between gap-2">
                 <button
                   onClick={goToPrevWeek}
