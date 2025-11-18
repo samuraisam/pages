@@ -1,5 +1,5 @@
 // Service Worker for Marathon Training Tracker PWA
-const CACHE_NAME = 'marathon-tracker-v1';
+const CACHE_NAME = 'marathon-tracker-v2';
 const urlsToCache = [
   '/',
   '/index.html',
