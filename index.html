@@ -129,11 +129,14 @@
       rest: { bg: 'bg-gray-50 dark:bg-gray-800', border: 'border-gray-200 dark:border-gray-700', text: 'text-gray-700 dark:text-gray-300', icon: '😴' }
     };
 
-    function WorkoutCard({ workout, date, index, completed, onToggleComplete, notes, onNotesChange, exerciseCompletion, onExerciseToggle, exerciseWeights, onWeightChange, plan }) {
+    function WorkoutCard({ workout, date, index, completed, onToggleComplete, notes, onNotesChange, exerciseCompletion, onExerciseToggle, allExerciseWeights, onWeightChange, plan }) {
       const [showNotes, setShowNotes] = useState(false);
       const [noteText, setNoteText] = useState(notes || '');
       const style = workoutStyles[workout.type] || workoutStyles.rest;
       const workoutKey = `${date}-${workout.type}-${index}`;
+
+      // Get weights for this specific workout
+      const currentWorkoutWeights = allExerciseWeights[workoutKey] || {};
 
       // Helper to find prior week's weight for the same exercise
       const getPriorWeekWeight = (exerciseName) => {
@@ -149,8 +152,8 @@
         const priorWorkoutKey = `${priorWeekDateStr}-${workout.type}-${index}`;
 
         // Check if we have weight data for this exercise by name
-        if (exerciseWeights[priorWorkoutKey] && exerciseWeights[priorWorkoutKey][exerciseName] !== undefined) {
-          return exerciseWeights[priorWorkoutKey][exerciseName];
+        if (allExerciseWeights[priorWorkoutKey] && allExerciseWeights[priorWorkoutKey][exerciseName] !== undefined) {
+          return allExerciseWeights[priorWorkoutKey][exerciseName];
         }
 
         return null;
@@ -216,7 +219,7 @@
                   const exStatus = exerciseCompletion[i];
                   const isCompleted = exStatus === 'completed';
                   const isSkipped = exStatus === 'skipped';
-                  const currentWeight = exerciseWeights[ex.name];
+                  const currentWeight = currentWorkoutWeights[ex.name];
                   const priorWeight = getPriorWeekWeight(ex.name);
 
                   return (
@@ -342,7 +345,7 @@
                     onNotesChange={onNotesChange}
                     exerciseCompletion={exerciseCompletion[workoutKey] || {}}
                     onExerciseToggle={onExerciseToggle}
-                    exerciseWeights={exerciseWeights[workoutKey] || {}}
+                    allExerciseWeights={exerciseWeights}
                     onWeightChange={onWeightChange}
                     plan={plan}
                   />
