@@ -136,7 +136,7 @@
       const workoutKey = `${date}-${workout.type}-${index}`;
 
       // Helper to find prior week's weight for the same exercise
-      const getPriorWeekWeight = (exerciseIndex, exerciseName) => {
+      const getPriorWeekWeight = (exerciseName) => {
         if (!plan) return null;
 
         // Calculate date 7 days prior
@@ -148,9 +148,9 @@
         // Look for the same workout on the prior week
         const priorWorkoutKey = `${priorWeekDateStr}-${workout.type}-${index}`;
 
-        // Check if we have weight data for this exercise
-        if (exerciseWeights[priorWorkoutKey] && exerciseWeights[priorWorkoutKey][exerciseIndex] !== undefined) {
-          return exerciseWeights[priorWorkoutKey][exerciseIndex];
+        // Check if we have weight data for this exercise by name
+        if (exerciseWeights[priorWorkoutKey] && exerciseWeights[priorWorkoutKey][exerciseName] !== undefined) {
+          return exerciseWeights[priorWorkoutKey][exerciseName];
         }
 
         return null;
@@ -216,8 +216,8 @@
                   const exStatus = exerciseCompletion[i];
                   const isCompleted = exStatus === 'completed';
                   const isSkipped = exStatus === 'skipped';
-                  const currentWeight = exerciseWeights[i];
-                  const priorWeight = getPriorWeekWeight(i, ex.name);
+                  const currentWeight = exerciseWeights[ex.name];
+                  const priorWeight = getPriorWeekWeight(ex.name);
 
                   return (
                     <div key={i} className="flex flex-col gap-1 pl-2 mb-2">
@@ -250,7 +250,7 @@
                         <input
                           type="number"
                           value={currentWeight || ''}
-                          onChange={(e) => onWeightChange(workoutKey, i, e.target.value)}
+                          onChange={(e) => onWeightChange(workoutKey, ex.name, e.target.value)}
                           placeholder={priorWeight ? `Last week: ${priorWeight} lbs` : 'Weight (lbs)'}
                           className="w-32 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                           disabled={completed}
@@ -584,12 +584,12 @@
         }
       };
 
-      const handleWeightChange = (workoutKey, exerciseIndex, weight) => {
+      const handleWeightChange = (workoutKey, exerciseName, weight) => {
         const updated = {
           ...exerciseWeights,
           [workoutKey]: {
             ...(exerciseWeights[workoutKey] || {}),
-            [exerciseIndex]: weight
+            [exerciseName]: weight
           }
         };
         setExerciseWeights(updated);
