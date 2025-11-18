@@ -110,6 +110,15 @@
       localStorage.setItem('exerciseCompletion', JSON.stringify(completion));
     };
 
+    const getExerciseWeights = () => {
+      const stored = localStorage.getItem('exerciseWeights');
+      return stored ? JSON.parse(stored) : {};
+    };
+
+    const saveExerciseWeights = (weights) => {
+      localStorage.setItem('exerciseWeights', JSON.stringify(weights));
+    };
+
     // Workout type colors and icons
     const workoutStyles = {
       running: { bg: 'bg-blue-50 dark:bg-blue-900/30', border: 'border-blue-200 dark:border-blue-700', text: 'text-blue-700 dark:text-blue-400', icon: '🏃' },
@@ -120,11 +129,32 @@
       rest: { bg: 'bg-gray-50 dark:bg-gray-800', border: 'border-gray-200 dark:border-gray-700', text: 'text-gray-700 dark:text-gray-300', icon: '😴' }
     };
 
-    function WorkoutCard({ workout, date, index, completed, onToggleComplete, notes, onNotesChange, exerciseCompletion, onExerciseToggle }) {
+    function WorkoutCard({ workout, date, index, completed, onToggleComplete, notes, onNotesChange, exerciseCompletion, onExerciseToggle, exerciseWeights, onWeightChange, plan }) {
       const [showNotes, setShowNotes] = useState(false);
       const [noteText, setNoteText] = useState(notes || '');
       const style = workoutStyles[workout.type] || workoutStyles.rest;
       const workoutKey = `${date}-${workout.type}-${index}`;
+
+      // Helper to find prior week's weight for the same exercise
+      const getPriorWeekWeight = (exerciseIndex, exerciseName) => {
+        if (!plan) return null;
+
+        // Calculate date 7 days prior
+        const currentDate = new Date(date + 'T00:00:00');
+        const priorWeekDate = new Date(currentDate);
+        priorWeekDate.setDate(priorWeekDate.getDate() - 7);
+        const priorWeekDateStr = priorWeekDate.toISOString().split('T')[0];
+
+        // Look for the same workout on the prior week
+        const priorWorkoutKey = `${priorWeekDateStr}-${workout.type}-${index}`;
+
+        // Check if we have weight data for this exercise
+        if (exerciseWeights[priorWorkoutKey] && exerciseWeights[priorWorkoutKey][exerciseIndex] !== undefined) {
+          return exerciseWeights[priorWorkoutKey][exerciseIndex];
+        }
+
+        return null;
+      };
 
       const handleSaveNotes = () => {
         onNotesChange(workoutKey, noteText);
@@ -186,31 +216,51 @@
                   const exStatus = exerciseCompletion[i];
                   const isCompleted = exStatus === 'completed';
                   const isSkipped = exStatus === 'skipped';
+                  const currentWeight = exerciseWeights[i];
+                  const priorWeight = getPriorWeekWeight(i, ex.name);
 
                   return (
-                    <div key={i} className="flex items-start gap-2 pl-2">
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <input
-                          type="checkbox"
-                          checked={isCompleted}
-                          onChange={() => onExerciseToggle(workoutKey, i, isCompleted ? null : 'completed')}
-                          className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                          disabled={completed}
-                        />
-                        <button
-                          onClick={() => onExerciseToggle(workoutKey, i, isSkipped ? null : 'skipped')}
-                          className={`text-xs px-1.5 py-0.5 rounded ${isSkipped ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/30'}`}
-                          disabled={completed}
-                          title="Skip exercise"
-                        >
-                          ✕
-                        </button>
+                    <div key={i} className="flex flex-col gap-1 pl-2 mb-2">
+                      <div className="flex items-start gap-2">
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <input
+                            type="checkbox"
+                            checked={isCompleted}
+                            onChange={() => onExerciseToggle(workoutKey, i, isCompleted ? null : 'completed')}
+                            className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            disabled={completed}
+                          />
+                          <button
+                            onClick={() => onExerciseToggle(workoutKey, i, isSkipped ? null : 'skipped')}
+                            className={`text-xs px-1.5 py-0.5 rounded ${isSkipped ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/30'}`}
+                            disabled={completed}
+                            title="Skip exercise"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <div className={`text-xs flex-1 ${isCompleted ? 'text-green-700 dark:text-green-400 line-through' : isSkipped ? 'text-red-600 dark:text-red-400 line-through' : 'text-gray-600 dark:text-gray-400'}`}>
+                          <span className="font-medium">{ex.name}</span>
+                          {ex.sets && ex.reps && ` - ${ex.sets}x${ex.reps}`}
+                          {ex.sets && ex.duration && ` - ${ex.sets}x${ex.duration}`}
+                          {ex.notes && <span className="text-gray-500 dark:text-gray-500 italic"> ({ex.notes})</span>}
+                        </div>
                       </div>
-                      <div className={`text-xs flex-1 ${isCompleted ? 'text-green-700 dark:text-green-400 line-through' : isSkipped ? 'text-red-600 dark:text-red-400 line-through' : 'text-gray-600 dark:text-gray-400'}`}>
-                        <span className="font-medium">{ex.name}</span>
-                        {ex.sets && ex.reps && ` - ${ex.sets}x${ex.reps}`}
-                        {ex.sets && ex.duration && ` - ${ex.sets}x${ex.duration}`}
-                        {ex.notes && <span className="text-gray-500 dark:text-gray-500 italic"> ({ex.notes})</span>}
+                      <div className="flex items-center gap-2 ml-12">
+                        <input
+                          type="number"
+                          value={currentWeight || ''}
+                          onChange={(e) => onWeightChange(workoutKey, i, e.target.value)}
+                          placeholder={priorWeight ? `Last week: ${priorWeight} lbs` : 'Weight (lbs)'}
+                          className="w-32 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                          disabled={completed}
+                          step="2.5"
+                        />
+                        {priorWeight && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            (Last: {priorWeight} lbs)
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
@@ -251,7 +301,7 @@
       );
     }
 
-    function DayView({ day, completedWorkouts, onToggleComplete, workoutNotes, onNotesChange, exerciseCompletion, onExerciseToggle }) {
+    function DayView({ day, completedWorkouts, onToggleComplete, workoutNotes, onNotesChange, exerciseCompletion, onExerciseToggle, exerciseWeights, onWeightChange, plan }) {
       const todayString = getTodayString();
       const isToday = isSameDay(day.date, todayString);
       const dayDate = new Date(day.date + 'T00:00:00'); // Parse as local date
@@ -292,6 +342,9 @@
                     onNotesChange={onNotesChange}
                     exerciseCompletion={exerciseCompletion[workoutKey] || {}}
                     onExerciseToggle={onExerciseToggle}
+                    exerciseWeights={exerciseWeights[workoutKey] || {}}
+                    onWeightChange={onWeightChange}
+                    plan={plan}
                   />
                 );
               })}
@@ -301,7 +354,7 @@
       );
     }
 
-    function WeekView({ week, phase, completedWorkouts, onToggleComplete, workoutNotes, onNotesChange, exerciseCompletion, onExerciseToggle }) {
+    function WeekView({ week, phase, completedWorkouts, onToggleComplete, workoutNotes, onNotesChange, exerciseCompletion, onExerciseToggle, exerciseWeights, onWeightChange, plan }) {
       const totalWorkouts = week.days.reduce((sum, day) => sum + day.workouts.length, 0);
       const completedCount = week.days.reduce((sum, day) => {
         return sum + day.workouts.filter((w, i) =>
@@ -381,6 +434,9 @@
               onNotesChange={onNotesChange}
               exerciseCompletion={exerciseCompletion}
               onExerciseToggle={onExerciseToggle}
+              exerciseWeights={exerciseWeights}
+              onWeightChange={onWeightChange}
+              plan={plan}
             />
           ))}
         </div>
@@ -395,6 +451,7 @@
       const [completedWorkouts, setCompletedWorkouts] = useState(getCompletedWorkouts());
       const [workoutNotes, setWorkoutNotes] = useState(getWorkoutNotes());
       const [exerciseCompletion, setExerciseCompletion] = useState(getExerciseCompletion());
+      const [exerciseWeights, setExerciseWeights] = useState(getExerciseWeights());
       const [showPlanInfo, setShowPlanInfo] = useState(false);
 
       useEffect(() => {
@@ -525,6 +582,18 @@
             });
           });
         }
+      };
+
+      const handleWeightChange = (workoutKey, exerciseIndex, weight) => {
+        const updated = {
+          ...exerciseWeights,
+          [workoutKey]: {
+            ...(exerciseWeights[workoutKey] || {}),
+            [exerciseIndex]: weight
+          }
+        };
+        setExerciseWeights(updated);
+        saveExerciseWeights(updated);
       };
 
       const goToPrevWeek = () => {
@@ -690,6 +759,9 @@
               onNotesChange={handleNotesChange}
               exerciseCompletion={exerciseCompletion}
               onExerciseToggle={handleExerciseToggle}
+              exerciseWeights={exerciseWeights}
+              onWeightChange={handleWeightChange}
+              plan={plan}
             />
           </div>
 
