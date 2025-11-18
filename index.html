@@ -101,6 +101,15 @@
       localStorage.setItem('workoutNotes', JSON.stringify(notes));
     };
 
+    const getExerciseCompletion = () => {
+      const stored = localStorage.getItem('exerciseCompletion');
+      return stored ? JSON.parse(stored) : {};
+    };
+
+    const saveExerciseCompletion = (completion) => {
+      localStorage.setItem('exerciseCompletion', JSON.stringify(completion));
+    };
+
     // Workout type colors and icons
     const workoutStyles = {
       running: { bg: 'bg-blue-50 dark:bg-blue-900/30', border: 'border-blue-200 dark:border-blue-700', text: 'text-blue-700 dark:text-blue-400', icon: '🏃' },
@@ -111,7 +120,7 @@
       rest: { bg: 'bg-gray-50 dark:bg-gray-800', border: 'border-gray-200 dark:border-gray-700', text: 'text-gray-700 dark:text-gray-300', icon: '😴' }
     };
 
-    function WorkoutCard({ workout, date, index, completed, onToggleComplete, notes, onNotesChange }) {
+    function WorkoutCard({ workout, date, index, completed, onToggleComplete, notes, onNotesChange, exerciseCompletion, onExerciseToggle }) {
       const [showNotes, setShowNotes] = useState(false);
       const [noteText, setNoteText] = useState(notes || '');
       const style = workoutStyles[workout.type] || workoutStyles.rest;
@@ -171,16 +180,41 @@
               <div className="text-gray-600 dark:text-gray-400 text-xs">Focus: {workout.focus}</div>
             )}
             {workout.exercises && workout.exercises.length > 0 && (
-              <div className="mt-2 space-y-1">
+              <div className="mt-2 space-y-2">
                 <div className="font-medium text-gray-700 dark:text-gray-300">Exercises:</div>
-                {workout.exercises.map((ex, i) => (
-                  <div key={i} className="text-xs text-gray-600 dark:text-gray-400 pl-4">
-                    • {ex.name}
-                    {ex.sets && ex.reps && ` - ${ex.sets}x${ex.reps}`}
-                    {ex.sets && ex.duration && ` - ${ex.sets}x${ex.duration}`}
-                    {ex.notes && <span className="text-gray-500 dark:text-gray-500 italic"> ({ex.notes})</span>}
-                  </div>
-                ))}
+                {workout.exercises.map((ex, i) => {
+                  const exStatus = exerciseCompletion[i];
+                  const isCompleted = exStatus === 'completed';
+                  const isSkipped = exStatus === 'skipped';
+
+                  return (
+                    <div key={i} className="flex items-start gap-2 pl-2">
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <input
+                          type="checkbox"
+                          checked={isCompleted}
+                          onChange={() => onExerciseToggle(workoutKey, i, isCompleted ? null : 'completed')}
+                          className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          disabled={completed}
+                        />
+                        <button
+                          onClick={() => onExerciseToggle(workoutKey, i, isSkipped ? null : 'skipped')}
+                          className={`text-xs px-1.5 py-0.5 rounded ${isSkipped ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/30'}`}
+                          disabled={completed}
+                          title="Skip exercise"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className={`text-xs flex-1 ${isCompleted ? 'text-green-700 dark:text-green-400 line-through' : isSkipped ? 'text-red-600 dark:text-red-400 line-through' : 'text-gray-600 dark:text-gray-400'}`}>
+                        <span className="font-medium">{ex.name}</span>
+                        {ex.sets && ex.reps && ` - ${ex.sets}x${ex.reps}`}
+                        {ex.sets && ex.duration && ` - ${ex.sets}x${ex.duration}`}
+                        {ex.notes && <span className="text-gray-500 dark:text-gray-500 italic"> ({ex.notes})</span>}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -217,7 +251,7 @@
       );
     }
 
-    function DayView({ day, completedWorkouts, onToggleComplete, workoutNotes, onNotesChange }) {
+    function DayView({ day, completedWorkouts, onToggleComplete, workoutNotes, onNotesChange, exerciseCompletion, onExerciseToggle }) {
       const todayString = getTodayString();
       const isToday = isSameDay(day.date, todayString);
       const dayDate = new Date(day.date + 'T00:00:00'); // Parse as local date
@@ -256,6 +290,8 @@
                     onToggleComplete={onToggleComplete}
                     notes={workoutNotes[workoutKey]}
                     onNotesChange={onNotesChange}
+                    exerciseCompletion={exerciseCompletion[workoutKey] || {}}
+                    onExerciseToggle={onExerciseToggle}
                   />
                 );
               })}
@@ -265,7 +301,7 @@
       );
     }
 
-    function WeekView({ week, phase, completedWorkouts, onToggleComplete, workoutNotes, onNotesChange }) {
+    function WeekView({ week, phase, completedWorkouts, onToggleComplete, workoutNotes, onNotesChange, exerciseCompletion, onExerciseToggle }) {
       const totalWorkouts = week.days.reduce((sum, day) => sum + day.workouts.length, 0);
       const completedCount = week.days.reduce((sum, day) => {
         return sum + day.workouts.filter((w, i) =>
@@ -343,6 +379,8 @@
               onToggleComplete={onToggleComplete}
               workoutNotes={workoutNotes}
               onNotesChange={onNotesChange}
+              exerciseCompletion={exerciseCompletion}
+              onExerciseToggle={onExerciseToggle}
             />
           ))}
         </div>
@@ -356,6 +394,7 @@
       const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
       const [completedWorkouts, setCompletedWorkouts] = useState(getCompletedWorkouts());
       const [workoutNotes, setWorkoutNotes] = useState(getWorkoutNotes());
+      const [exerciseCompletion, setExerciseCompletion] = useState(getExerciseCompletion());
       const [showPlanInfo, setShowPlanInfo] = useState(false);
 
       useEffect(() => {
@@ -441,6 +480,51 @@
         };
         setWorkoutNotes(updated);
         saveWorkoutNotes(updated);
+      };
+
+      const handleExerciseToggle = (workoutKey, exerciseIndex, status) => {
+        const updated = {
+          ...exerciseCompletion,
+          [workoutKey]: {
+            ...(exerciseCompletion[workoutKey] || {}),
+            [exerciseIndex]: status
+          }
+        };
+        setExerciseCompletion(updated);
+        saveExerciseCompletion(updated);
+
+        // Check if all exercises are completed or skipped, and auto-complete the workout
+        // Find the workout to get exercise count
+        const [dateStr, type, idx] = workoutKey.split('-');
+        const workoutIndex = parseInt(idx);
+
+        if (plan) {
+          plan.phases.forEach(phase => {
+            phase.weeks.forEach(week => {
+              week.days.forEach(day => {
+                if (day.date === dateStr) {
+                  const workout = day.workouts[workoutIndex];
+                  if (workout && workout.exercises && workout.exercises.length > 0) {
+                    const exerciseStatuses = updated[workoutKey] || {};
+                    const allExercisesHandled = workout.exercises.every((_, i) =>
+                      exerciseStatuses[i] === 'completed' || exerciseStatuses[i] === 'skipped'
+                    );
+
+                    if (allExercisesHandled && !completedWorkouts[workoutKey]) {
+                      // Auto-complete the workout
+                      const updatedWorkouts = {
+                        ...completedWorkouts,
+                        [workoutKey]: true
+                      };
+                      setCompletedWorkouts(updatedWorkouts);
+                      saveCompletedWorkouts(updatedWorkouts);
+                    }
+                  }
+                }
+              });
+            });
+          });
+        }
       };
 
       const goToPrevWeek = () => {
@@ -604,6 +688,8 @@
               onToggleComplete={handleToggleComplete}
               workoutNotes={workoutNotes}
               onNotesChange={handleNotesChange}
+              exerciseCompletion={exerciseCompletion}
+              onExerciseToggle={handleExerciseToggle}
             />
           </div>
 
