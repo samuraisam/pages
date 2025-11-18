@@ -283,7 +283,16 @@
           return daySum;
         }, 0);
       }, 0);
-      const projectedMiles = parseFloat(week.total_mileage) || 0;
+
+      // Calculate projected miles by summing all running workout distances in the week
+      const projectedMiles = week.days.reduce((sum, day) => {
+        return sum + day.workouts.reduce((daySum, w) => {
+          if (w.distance_miles && w.type === 'running') {
+            return daySum + parseFloat(w.distance_miles);
+          }
+          return daySum;
+        }, 0);
+      }, 0);
 
       return (
         <div className="max-w-4xl mx-auto">
